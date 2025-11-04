@@ -6,35 +6,18 @@
 % Helper functions
 % ****************************************************************
 
-#(define-markup-command (example layout props left_text right_text) (markup? markup?)
-   (interpret-markup layout props
-      (markup
-          #:column (
-              #:vspace 1
-              #:fill-line (
-                     (#:column (left_text))
-                     (#:column ("➡"))
-                     (#:column (right_text))
-              ) ;; fill-line
-              #:vspace 1
-          ) ;; column
-)))
-
 % shortcut for the \typewriter command
-#(define-markup-command (tw layout props text) (string?)
+#(define-markup-command (code layout props text) (string?)
   (interpret-markup layout props (markup #:typewriter text)))
 
-code = #(define-markup-command (code layout props s) (string?)
-         (interpret-markup layout props (markup #:typewriter s)))
-
 % 3 columns layout
-#(define-markup-command (example layout props left_text right_text) (markup? markup?)
+#(define-markup-command (example layout props left right_text) (markup? markup?)
    (interpret-markup layout props
       (markup
           #:column (
               #:vspace 1
               #:fill-line (
-                     (#:column (left_text))
+                     (#:column (left))
                      (#:column ("➡"))
                      (#:column (right_text))
               ) ;; fill-line
@@ -42,19 +25,40 @@ code = #(define-markup-command (code layout props s) (string?)
           ) ;; column
 )))
 
-% --- Helper: render music inside markup  ---
+
+% --- Render music inside markup  ---
 #(define-markup-command (writeMusic layout props music) (ly:music?)
   (let* ((score (ly:make-score music))
          (lydef (ly:output-def-clone $defaultlayout)))
     (ly:score-add-output-def! score lydef)
     (interpret-markup layout props (markup #:score score))))
 
+% --- Render music inside markup (no time / clef / key / bar numbers) ---
+#(define-markup-command (writeMusicNoTime layout props music) (ly:music?)
+  (let* ((score (ly:make-score
+                  #{
+                    \new Staff \with {
+                      \remove "Time_signature_engraver"
+                      %\remove "Bar_number_engraver"
+                      %\remove "Clef_engraver"
+                      \remove "Key_engraver"
+                    } { #music }
+                  #}))
+         (lydef (ly:output-def-clone $defaultlayout)))
+    (ly:score-add-output-def! score lydef)
+    (interpret-markup layout props (markup #:score score))))
 
-#(define-markup-command (section-title layout props title) (markup?)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MACROS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% SECTION TITLE
+#(define-markup-command (sectionTitle layout props title_text) (markup?)
   (interpret-markup layout props
-   (markup #:column (#:vspace 2
-                    (#:fontsize 2 title)
-                     #:vspace 1))))
+   (markup #:column (#:vspace 1.5
+                    (#:fontsize 2 #:bold #:smallCaps  title_text)
+                     #:vspace 0.75))))
 
 
 
@@ -90,21 +94,28 @@ code = #(define-markup-command (code layout props s) (string?)
       }
       
 % ================================================================
-\markup \section-title "NOTE DURATION & RHYTHM"    
+\markup \sectionTitle "NOTE DURATION & RHYTHM"    
 % ================================================================
-\markup \bold { "Write triplets"}  
+
+example_duration = \relative c' { \cadenzaOn  c1 c2 c4 c8 c16 c32  }
+\markup \example 
+          \writeMusicNoTime {\example_duration}  
+          { \typewriter \concat {"c1 " "c2 " "c4" "c8 " "c16 " "c32 "}}  
+
+\markup \bold { "Triplets"}  
 \markup \fill-line {
   \column { 
-    \score {
-       \relative c' { \tuplet 3/2 { d8 e f }}
-       \layout { }
-    }     
+    \writeMusicNoTime{ \relative c' { \tuplet 3/2 { d8 e f } \tupletDown \tuplet 3/2 { d8 e f }}}   
+    { \line {\fontsize #-2 {\italic {"We can use" \typewriter "\\tupletDown" " to..."}}}}
   } 
-  \column { "=>" }     \column { \typewriter "\\tuplet 3/2 { d8 e f }" }  
+  \column { "=>" } \column { \typewriter \fontsize #-1 "\\tuplet 3/2 { d8 e f } " }  
 }
 
 
-\markup \section-title "BOWING INDICATIONS"
+
+
+
+\markup \sectionTitle "BOWING INDICATIONS"
 
 example_bowing = \relative c' { c2\downbow e\upbow  }
 \markup \fill-line {
@@ -121,7 +132,7 @@ example_bowing = \relative c' { c2\downbow e\upbow  }
 
 
 
-\markup \section-title "Articulations"    
+\markup \sectionTitle "Articulations"    
 example_accent = \relative c''{f^\accent e,_\accent b'-\accent}
 \markup \fill-line {
   \column { \score { \example_accent }} 
@@ -137,55 +148,98 @@ example_staccato = \relative c''{f-. e,-. b'-.}
   \column { \score { \example_staccato }} 
   \column { "=>" }
   \column { \typewriter \concat {"f" \bold "^\staccato" " e," \bold "-." " b'" \bold "-." " e2"}
-             \concat { \tw "\staccato" " or " \tw "-."}  }
+             \concat { \code "\staccato" " or " \code "-."}  }
 }
 
 \markup \vspace #2  
 
 % ================================================================
-\markup \section-title "FINGERINGS"
+\markup \sectionTitle "FINGERINGS"
+% ================================================================
+example_finger = \relative c' { c4-1 d-2 e-3 f-4 }
+\markup \example 
+          \writeMusic {\example_finger}  
+          { \typewriter "{ c4-1 d-2 e-3 f-4 }"}
+
+
+
+% String numbers (1=E, 2=A, 3=D, 4=G by convention)
+example_string = \relative c' { c4-\1 d-\2 e-\3 f-\4 }
+\markup \example
+   \writeMusic {\example_string }
+  "\\relative c' { c4-\\1 d-\\2 e-\\3 f-\\4 }"
+
+% ================================================================
+\markup \sectionTitle "HARMONICS" 
+% ================================================================
+\markup \bold "Flageolet"
+example_flageolet_harmonic = { a'4-4\flageolet }
+\markup \example
+   \writeMusic {\example_flageolet_harmonic}
+  
+  
+  { \code "a-4\flageolet" }
+
+\markup \bold  "Natural"
+example_natural_harmonic = { a'4-4\harmonic }
+\markup \example
+  \writeMusic {\example_natural_harmonic}
+  { \code "a-4\harmonic" }
+
+\markup \bold  "Artificial"
+example_artificial_harmonic = { <e'_1 a'\harmonic>4-4 } 
+\markup \example
+  \writeMusic {\example_artificial_harmonic}
+  { \code "<e_1 a'\harmonic>4-4>" }
+
+
+
+% ================================================================
+\markup \sectionTitle "POSITIONS"
 % ================================================================
 
 
 % ================================================================
-\markup \section-title "HARMONICS" 
-% ================================================================
-\markup "Natural"
-\markup "Artificial"
-
-
-% ================================================================
-\markup \section-title "POSITIONS"
-% ================================================================
-
-
-% ================================================================
-\markup \section-title "DOUBLE-STOPS"
+\markup \sectionTitle "DOUBLE-STOPS"
 % ================================================================
 example_double_stops = \relative c'{ <a g' cs>2 <a fs' d'> }
 \markup \example 
           \writeMusic {\example_double_stops}  
           { \typewriter \concat {"<a g' cs>2 <a fs' d'>"}}  
 
-\markup \vspace #2  
-
-
 % ================================================================
-\markup \section-title "ORNAMENTS"
+\markup \sectionTitle "ORNAMENTS"
 % ================================================================
 \markup "Grace, Trill, mordent, turns, appoggiaturas"
 
 
 
 % ================================================================
-\markup \section-title  "GLISSANDO"
+\markup \sectionTitle  "GLISSANDO"
 % ================================================================
 \markup  "Continuous slide or expressive shift"
 example_glissando =  { c4 \glissando g e \glissando c }  
 
 
+% ================================================================
+\markup \sectionTitle  "LAYOUT TIPS"
+% ================================================================
 
-\markup \bold { "LAYOUT TIPS"}  
+\markup \vspace #2  
+\markup \bold { "How to remove first score indentation?"}  
+\markup \fill-line {
+  \column { 
+    \score {
+       %% NONE
+       s1
+    }     
+  } 
+  \column { "=>" }
+  \column {
+    \typewriter "\\layout { indent = 0\in}"
+  }
+}
+
 
 \markup \vspace #1
 \markup \bold { "Add vertical space" }
@@ -208,20 +262,7 @@ example_glissando =  { c4 \glissando g e \glissando c }
 
 
 
-\markup \vspace #2  
-\markup \bold { "How to remove first score indentation?"}  
-\markup \fill-line {
-  \column { 
-    \score {
-       %% NONE
-       s1
-    }     
-  } 
-  \column { "=>" }
-  \column {
-    \typewriter "\\layout { indent = 0\in}"
-  }
-}
+
 
 
 \markup \vspace #2  
@@ -258,33 +299,5 @@ example_glissando =  { c4 \glissando g e \glissando c }
 \markup \vspace #2  
 
 
-\markup { "Here is an example of a score within markup"}
-
-
-% ****************************************************************
-% ly snippet:
-% ****************************************************************
-\markup {
-  violin: \score { \new Staff { <g d' a' e''>1 }
-                   \layout { indent=0 } } ,
-  cello: \score { \new Staff { \clef "bass" <c, g, d a> }
-                  \layout { indent=0 } }
-}
-
-
-\markup { "Here we add a score"}
-
-soprano = \relative c' { c e g c }
-alto = \relative c' { a c e g }
-verse = \lyricmode { This is my song }
-
-\score {
-  \new Staff <<
-    \partCombine \soprano \alto
-    \new NullVoice = "aligner" \soprano
-    \new Lyrics \lyricsto "aligner" \verse
-  >>
-  \layout {}
-}
 
 
